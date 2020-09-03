@@ -160,6 +160,13 @@ class Event implements PingableInterface
     private static $clock;
 
     /**
+     * Custom lock key that can be set to prevent overlapping of distinct tasks.
+     *
+     * @var string
+     */
+    private $customLockKey = null;
+
+    /**
      * The symfony lock factory that is used to acquire locks. If the value is null, but preventOverlapping = true
      * crunz falls back to filesystem locks.
      *
@@ -1114,6 +1121,16 @@ class Event implements PingableInterface
     }
 
     /**
+     * When using preventOverlapping, a unique key is generated for each task to make sure the same task does not overlap with itself. This function allows to set a custom key to prevent the task from overlapping with other tasks
+     * that use the same custom key.
+     */
+    public function lockKey(string $key): self
+    {
+      $this->customLockKey = $key;
+      return $this;
+    }
+
+    /**
      * Get the symfony lock object for the task.
      *
      * @return Lock
@@ -1126,7 +1143,7 @@ class Event implements PingableInterface
             $ttl = 30;
 
             $this->lock = $this->lockFactory
-                ->createLock($this->lockKey(), $ttl);
+                ->createLock($this->getLockKey(), $ttl);
         }
 
         return $this->lock;
@@ -1308,9 +1325,9 @@ class Event implements PingableInterface
     /**
      * @return string
      */
-    private function lockKey()
+    private function getLockKey()
     {
-        return 'crunz-' . \md5($this->buildCommand());
+        return $this->customLockKey ?? 'crunz-' . \md5($this->buildCommand());
     }
 
     private function checkLockFactory()
